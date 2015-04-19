@@ -19,11 +19,7 @@
  */
 #![allow(dead_code)]
 
-use std::mem::transmute;
-use std::mem::size_of;
-use std::num::from_uint;
-use std::num::{ FromPrimitive, Int, UnsignedInt };
-
+use std::mem;
 
 /**
  * Flip a float for sorting.
@@ -76,22 +72,41 @@ fn sum_histograms(hist: &mut[usize], sum: &mut[usize],
 }
 
 
-fn radix_pass<K: UnsignedInt, V: Clone>(
+macro_rules! radix_pass(
+	($key_ty:ty, $keys_in:ident, $keys_out:ident, $values_in:ident, $values_out:ident, $hist:ident, $shift:ident, $mask:ident) => {{
+		let size = $keys_in.len();
+		for i in 0..size
+		{
+			let key = $keys_in[i];
+			let pos = ((key >> $shift) & $mask) as usize;
+			let index = $hist[pos];
+			$hist[pos] += 1;
+			$keys_out[index] = key;
+			// TODO: is there a better general purpose way of copying?
+			mem::swap(&mut $values_out[index], &mut $values_in[i]);
+		}
+	}}
+);
+
+
+/*
+fn radix_pass<K: Unsigned + Integer + FromPrimitive + ToPrimitive, V: Clone>(
 	keys_in: &[K], keys_out: &mut[K],
 	values_in: &[V], values_out: &mut[V],
-	hist: &mut[usize], shift: usize, mask: K)
+	hist: &mut[usize], shift: usize, mask: usize)
 {
 	let size = keys_in.len();
 	for i in (0..size)
 	{
-		let key = keys_in[i];
-		let pos = ((key >> shift) & mask).to_uint().unwrap();
+		let key = ToPrimitive::to_usize(&keys_in[i]).unwrap();
+		let pos = (key >> shift) & mask;
 		let index = hist[pos];
 		hist[pos] += 1;
-		keys_out[index] = key;
+		keys_out[index] = FromPrimitive::from_usize(key).unwrap();
 		values_out[index] = values_in[i].clone();
 	}
 }
+*/
 
 
 fn radix_pass_decode_float<V: Clone>(
@@ -130,126 +145,119 @@ fn radix_pass_encode_float<V: Clone>(
 }
 
 
-fn radix_sort_uint<K: UnsignedInt + FromPrimitive, V: Clone>(radix_bits: usize,
-	keys_in: &mut[K], keys_temp: &mut[K],
-	values_in: &mut[V], values_temp: &mut[V],
-	hist: &mut[usize], sum: &mut[usize], hist_buckets: usize) -> usize
-{
-	assert_eq!(keys_in.len(), values_in.len());
-	assert_eq!(keys_in.len(), keys_temp.len());
-	assert_eq!(values_in.len(), values_temp.len());
-	let hist_size = 1 << radix_bits;
-	let key_hist_size = from_uint::<K>(hist_size).unwrap();
-	let key_hist_mask = key_hist_size - Int::one();
-	let key_radix_bits = radix_bits;
+macro_rules! radix_sort_uint {
+	($key_ty:ty, $radix_bits:ident, $keys_in:ident, $keys_temp:ident, $values_in:ident, $values_temp:ident,
+	$hist:ident, $sum:ident, $hist_buckets:ident) =>
+	{{
+		assert_eq!($keys_in.len(), $values_in.len());
+		assert_eq!($keys_in.len(), $keys_temp.len());
+		assert_eq!($values_in.len(), $values_temp.len());
+		let hist_size = 1us << $radix_bits;
+		let hist_mask = (hist_size - 1us) as $key_ty;
 
-	for key in keys_in.iter()
-	{
-		for bucket in (0..hist_buckets)
+		for key in $keys_in.iter()
 		{
-			let key_shift = bucket * radix_bits;
-			let pos = ((*key >> key_shift) & key_hist_mask).to_uint().unwrap();
-			let index = bucket * hist_size + pos;
-			hist[index] += 1;
+			for bucket in 0..$hist_buckets
+			{
+				let key_shift = bucket * $radix_bits;
+				let pos = (*key >> key_shift) & hist_mask as $key_ty;
+				let index = bucket * hist_size + pos as usize;
+				$hist[index] += 1;
+			}
 		}
-	}
 
-	sum_histograms(hist, sum, hist_buckets, hist_size);
+		sum_histograms(&mut $hist, &mut $sum, $hist_buckets, hist_size);
 
-	let mut key_bits = 0us;
-	let mut i0 = 0;
-	let mut i1 = hist_size;
-	for i in (0..hist_buckets)
-	{
-		let bucket = &mut hist[i0..i1];
-		match i & 1
+		let mut key_bits = 0us;
+		let mut i0 = 0us;
+		let mut i1 = hist_size as usize;
+		for i in 0..$hist_buckets
 		{
-			0 => radix_pass(keys_in, keys_temp, values_in, values_temp, bucket,
-					key_bits, key_hist_mask),
-			_ => radix_pass(keys_temp, keys_in, values_temp, values_in, bucket,
-					key_bits, key_hist_mask)
+			let bucket = &mut $hist[i0..i1];
+			match i & 1
+			{
+				0 => radix_pass!($key_ty, $keys_in, $keys_temp, $values_in, $values_temp, bucket, key_bits,
+								 hist_mask),
+				_ => radix_pass!($key_ty, $keys_temp, $keys_in, $values_temp, $values_in, bucket, key_bits,
+								 hist_mask)
+			}
+			i0 += hist_size;
+			i1 += hist_size;
+			key_bits = key_bits + $radix_bits;
 		}
-		i0 += hist_size;
-		i1 += hist_size;
-		key_bits = key_bits + key_radix_bits;
-	}
-	return hist_buckets;
+		$hist_buckets
+	}};
 }
 
 
+macro_rules! radix_sort_float(
+	($radix_bits:ident, $keys_in:ident, $keys_temp:ident, $values_in:ident, $values_temp:ident, $hist:ident, $sum:ident, $hist_buckets:ident) => {{
+		let keys_in: &mut[u32] = unsafe { mem::transmute($keys_in) };
+		let keys_temp: &mut[u32] = unsafe { mem::transmute($keys_temp) };
 
-fn radix_sort_float<V: Clone>(radix_bits: usize,
-	fkeys_in: &mut[f32], fkeys_temp: &mut[f32],
-	values_in: &mut[V], values_temp: &mut[V],
-	hist: &mut[usize], sum: &mut[usize], hist_buckets: usize) -> usize
-{
-	let keys_in: &mut[u32] = unsafe { transmute(fkeys_in) };
-	let keys_temp: &mut[u32] = unsafe { transmute(fkeys_temp) };
+		assert_eq!(keys_in.len(), $values_in.len());
+		assert_eq!(keys_in.len(), keys_temp.len());
+		assert_eq!($values_in.len(), $values_temp.len());
 
-	assert_eq!(keys_in.len(), values_in.len());
-	assert_eq!(keys_in.len(), keys_temp.len());
-	assert_eq!(values_in.len(), values_temp.len());
+		let hist_size = 1us << $radix_bits;
+		let hist_mask = (hist_size - 1) as u32;
 
-	let hist_size = 1 << radix_bits;
-	let key_hist_size = from_uint::<u32>(hist_size).unwrap();
-	let key_hist_mask = key_hist_size - 1;
-	let key_radix_bits = radix_bits;
-
-	for key_ref in keys_in.iter()
-	{
-		for bucket in (0..hist_buckets)
+		for key_ref in keys_in.iter()
 		{
-			let key = float_flip(*key_ref);
-			let key_shift = bucket * radix_bits;
-			let pos = ((key >> key_shift) & key_hist_mask) as usize;
-			let index = bucket * hist_size + pos;
-			hist[index] += 1;
+			for bucket in (0..$hist_buckets)
+			{
+				let key = float_flip(*key_ref);
+				let key_shift = bucket * $radix_bits;
+				let pos = ((key >> key_shift) & hist_mask) as usize;
+				let index = bucket * hist_size as usize + pos;
+				$hist[index] += 1;
+			}
 		}
-	}
 
-	sum_histograms(hist, sum, hist_buckets, hist_size);
+		sum_histograms(&mut $hist, &mut $sum, $hist_buckets, hist_size);
 
-	let mut key_bits = 0us;
-	let mut i0 = 0;
-	let mut i1 = hist_size;
+		let mut key_bits = 0us;
+		let mut i0 = 0;
+		let mut i1 = hist_size;
 
-	{
-		let bucket = &mut hist[i0..i1];
-		radix_pass_decode_float(keys_in, keys_temp, values_in, values_temp, bucket,
-			key_bits, key_hist_mask);
-		key_bits += key_radix_bits;
-		i0 += hist_size;
-		i1 += hist_size;
-	}
-
-	for i in (1..hist_buckets - 1)
-	{
-		let bucket = &mut hist[i0..i1];
-		match i & 1
 		{
-			0 => radix_pass(keys_in, keys_temp, values_in, values_temp, bucket,
-					key_bits, key_hist_mask),
-			_ => radix_pass(keys_temp, keys_in, values_temp, values_in, bucket,
-					key_bits, key_hist_mask)
+			let bucket = &mut $hist[i0..i1];
+			radix_pass_decode_float(keys_in, keys_temp, $values_in, $values_temp, bucket,
+				key_bits, hist_mask);
+			key_bits += $radix_bits;
+			i0 += hist_size;
+			i1 += hist_size;
 		}
-		key_bits += key_radix_bits;
-		i0 += hist_size;
-		i1 += hist_size;
-	}
 
-	{
-		let bucket = &mut hist[i0..i1];
-		match (hist_buckets - 1) & 1
+		for i in (1..$hist_buckets - 1)
 		{
-			0 => radix_pass_encode_float(keys_in, keys_temp, values_in, values_temp, bucket,
-					key_bits, key_hist_mask),
-			_ => radix_pass_encode_float(keys_temp, keys_in, values_temp, values_in, bucket,
-					key_bits, key_hist_mask)
+			let bucket = &mut $hist[i0..i1];
+			match i & 1
+			{
+				0 => radix_pass!(u32, keys_in, keys_temp, $values_in, $values_temp, bucket,
+						key_bits, hist_mask),
+				_ => radix_pass!(u32, keys_temp, keys_in, $values_temp, $values_in, bucket,
+						key_bits, hist_mask)
+			}
+			key_bits += $radix_bits;
+			i0 += hist_size;
+			i1 += hist_size;
 		}
-	}
 
-	return hist_buckets;
-}
+		{
+			let bucket = &mut $hist[i0..i1];
+			match ($hist_buckets - 1) & 1
+			{
+				0 => radix_pass_encode_float(keys_in, keys_temp, $values_in, $values_temp, bucket,
+						key_bits, hist_mask),
+				_ => radix_pass_encode_float(keys_temp, keys_in, $values_temp, $values_in, bucket,
+						key_bits, hist_mask)
+			}
+		}
+
+		$hist_buckets
+	}}
+);
 
 
 pub fn radix8sort_u64<V: Clone>(
@@ -260,13 +268,13 @@ pub fn radix8sort_u64<V: Clone>(
 	const KEY_BITS: usize = 8 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<u64>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<u64>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_uint(RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_uint!(u64, RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
 
@@ -278,14 +286,14 @@ pub fn radix8sort_u32<V: Clone>(
 	const KEY_BITS: usize = 4 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<f32>() * 8);
-	assert_eq!(KEY_BITS, size_of::<u32>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<f32>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<u32>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_uint(RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_uint!(u32, RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
 
@@ -297,13 +305,13 @@ pub fn radix8sort_f32<V: Clone>(
 	const KEY_BITS: usize = 4 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<f32>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<f32>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_float(RADIX_BITS, fkeys_in, fkeys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_float!(RADIX_BITS, fkeys_in, fkeys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
 
@@ -315,13 +323,13 @@ pub fn radix11sort_u64<V: Clone>(
 	const KEY_BITS: usize = 8 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<u64>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<u64>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_uint(RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_uint!(u64, RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
 
@@ -333,13 +341,13 @@ pub fn radix11sort_u32<V: Clone>(
 	const KEY_BITS: usize = 4 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<u32>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<u32>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_uint(RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_uint!(u32, RADIX_BITS, keys_in, keys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
 
@@ -351,12 +359,12 @@ pub fn radix11sort_f32<V: Clone>(
 	const KEY_BITS: usize = 4 * 8;
 	const HIST_BUCKETS: usize = 1 + (KEY_BITS - 1) / RADIX_BITS;
 	const HISY_SIZE: usize = 1 << RADIX_BITS;
-	assert_eq!(KEY_BITS, size_of::<f32>() * 8);
+	assert_eq!(KEY_BITS, mem::size_of::<f32>() * 8);
 
 	let mut hist = [0us; HISY_SIZE * HIST_BUCKETS];
 	let mut sum = [0us; HIST_BUCKETS];
 
-	return radix_sort_float(RADIX_BITS, fkeys_in, fkeys_temp, values_in, values_temp,
-		&mut hist, &mut sum, HIST_BUCKETS);
+	return radix_sort_float!(RADIX_BITS, fkeys_in, fkeys_temp, values_in, values_temp,
+		hist, sum, HIST_BUCKETS);
 }
 
