@@ -1,3 +1,4 @@
+*.swp
 Cargo.lock
 Session.vim
 target/
