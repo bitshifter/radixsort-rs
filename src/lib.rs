@@ -155,8 +155,8 @@ macro_rules! radix_sort_uint {
 		const HIST_MASK: $key_ty = (HIST_SIZE - 1) as $key_ty;
 		assert_eq!(KEY_BITS, mem::size_of::<$key_ty>() * 8);
 
-		let mut hist = [0us; HIST_SIZE * HIST_BUCKETS];
-		let mut sum = [0us; HIST_BUCKETS];
+		let mut hist = [0; HIST_SIZE * HIST_BUCKETS];
+		let mut sum = [0; HIST_BUCKETS];
 
 		assert_eq!($keys_in.len(), $values_in.len());
 		assert_eq!($keys_in.len(), $keys_temp.len());
@@ -175,8 +175,8 @@ macro_rules! radix_sort_uint {
 
 		sum_histograms(&mut hist, &mut sum, HIST_BUCKETS, HIST_SIZE);
 
-		let mut key_bits = 0us;
-		let mut i0 = 0us;
+		let mut key_bits = 0;
+		let mut i0 = 0;
 		let mut i1 = HIST_SIZE;
 		for i in 0..HIST_BUCKETS
 		{
@@ -206,8 +206,8 @@ macro_rules! radix_sort_float(
 		const HIST_MASK: u32 = (HIST_SIZE - 1) as u32;
 		assert_eq!(KEY_BITS, mem::size_of::<f32>() * 8);
 
-		let mut hist = [0us; HIST_SIZE * HIST_BUCKETS];
-		let mut sum = [0us; HIST_BUCKETS];
+		let mut hist = [0; HIST_SIZE * HIST_BUCKETS];
+		let mut sum = [0; HIST_BUCKETS];
 
 		let keys_in: &mut[u32] = unsafe { mem::transmute($keys_in) };
 		let keys_temp: &mut[u32] = unsafe { mem::transmute($keys_temp) };
@@ -230,7 +230,7 @@ macro_rules! radix_sort_float(
 
 		sum_histograms(&mut hist, &mut sum, HIST_BUCKETS, HIST_SIZE);
 
-		let mut key_bits = 0us;
+		let mut key_bits = 0;
 		let mut i0 = 0;
 		let mut i1 = HIST_SIZE;
 
