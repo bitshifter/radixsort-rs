@@ -1,6 +1,6 @@
 [package]
 
-name = "radixsort-rs"
+name = "radixsort"
 version = "0.0.1"
 authors = ["Cameron Hart <cameron.hart@gmail.com>"]
 
