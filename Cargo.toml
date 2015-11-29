@@ -1,17 +1,11 @@
 [package]
 
-name = "radixsort"
+name = "radixsort-rs"
 version = "0.0.1"
-authors = ["Cameron Hart <cam@bitshifter.net.nz>"]
+authors = ["Cameron Hart <cameron.hart@gmail.com>"]
 
 [dependencies]
-rand = "*"
-time = "*"
-sortrs = "*"
 num = "*"
-
-[profile.dev]
-opt-level = 3  # Controls the --opt-level the compiler builds with
-debug = true   # Controls whether the compiler passes -g or `--cfg ndebug`
-rpath = false  # Controls whether the compiler passes `-C rpath`
-lto = false    # Controls `-C lto` for binaries and staticlibs
+rand = "*"
+sortrs = "*"
+time = "*"
