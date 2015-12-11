@@ -27,8 +27,7 @@ use std::mem;
  *  if it's 1 (negative float), it flips all bits
  *  if it's 0 (positive float), it flips the sign only
  */
-fn float_flip(f: u32) -> u32
-{
+fn float_flip(f: u32) -> u32 {
 	let mask = (-((f >> 31) as i32) as u32) | 0x80000000;
 	f ^ mask
 }
@@ -40,8 +39,7 @@ fn float_flip(f: u32) -> u32
  *  if sign is 1 (negative), it flips the sign bit back
  *  if sign is 0 (positive), it flips all bits back
  */
-fn inv_float_flip(f: u32) -> u32
-{
+fn inv_float_flip(f: u32) -> u32 {
 	let mask = ((f >> 31) - 1) | 0x80000000;
 	f ^ mask
 }
@@ -72,8 +70,7 @@ fn sum_histograms(hist: &mut[usize], sum: &mut[usize],
 macro_rules! radix_pass(
 	($key_ty:ty, $keys_in:ident, $keys_out:ident, $values_in:ident, $values_out:ident, $hist:ident, $shift:ident, $mask:ident) => {{
 		let size = $keys_in.len();
-		for i in 0..size
-		{
+		for i in 0..size {
 			let key = $keys_in[i];
 			let pos = ((key >> $shift) & $mask) as usize;
 			let index = $hist[pos];
