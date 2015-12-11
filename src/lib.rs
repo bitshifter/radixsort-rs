@@ -51,18 +51,15 @@ fn sum_histograms(hist: &mut[usize], sum: &mut[usize],
 	hist_buckets: usize, hist_size: usize)
 {
 	// Update the histogram data so each entry sums the previous entries
-	for bucket in (0..hist_buckets)
-	{
+	for bucket in 0..hist_buckets {
 		let histindex = bucket * hist_size;
 		sum[bucket] = hist[histindex];
 		hist[histindex] = 0;
 	}
 
 	let mut tsum : usize;
-	for i in (1..hist_size)
-	{
-		for bucket in (0..hist_buckets)
-		{
+	for i in 1..hist_size {
+		for bucket in 0..hist_buckets {
 			let histindex = bucket * hist_size + i;
 			tsum = hist[histindex] + sum[bucket];
 			hist[histindex] = sum[bucket];
@@ -96,8 +93,7 @@ fn radix_pass<K: Unsigned + Integer + FromPrimitive + ToPrimitive, V: Clone>(
 	hist: &mut[usize], shift: usize, mask: usize)
 {
 	let size = keys_in.len();
-	for i in (0..size)
-	{
+	for i in 0..size {
 		let key = ToPrimitive::to_usize(&keys_in[i]).unwrap();
 		let pos = (key >> shift) & mask;
 		let index = hist[pos];
@@ -115,8 +111,7 @@ fn radix_pass_decode_float<V: Clone>(
 	hist: &mut[usize], shift: usize, mask: u32)
 {
 	let size = keys_in.len();
-	for i in (0..size)
-	{
+	for i in 0..size {
 		let key = float_flip(keys_in[i]) as usize;
 		let pos = (key >> shift as usize) & mask as usize;
 		let index = hist[pos];
@@ -133,8 +128,7 @@ fn radix_pass_encode_float<V: Clone>(
 	hist: &mut[usize], shift: usize, mask: u32)
 {
 	let size = keys_in.len();
-	for i in (0..size)
-	{
+	for i in 0..size {
 		let key = keys_in[i];
 		let pos = ((key >> shift as usize) & mask) as usize;
 		let index = hist[pos];
@@ -162,10 +156,8 @@ macro_rules! radix_sort_uint {
 		assert_eq!($keys_in.len(), $keys_temp.len());
 		assert_eq!($values_in.len(), $values_temp.len());
 
-		for key in $keys_in.iter()
-		{
-			for bucket in 0..HIST_BUCKETS
-			{
+		for key in $keys_in.iter() {
+			for bucket in 0..HIST_BUCKETS {
 				let key_shift = bucket * RADIX_BITS;
 				let pos = (*key >> key_shift) & HIST_MASK as $key_ty;
 				let index = bucket * HIST_SIZE + pos as usize;
@@ -178,11 +170,9 @@ macro_rules! radix_sort_uint {
 		let mut key_bits = 0;
 		let mut i0 = 0;
 		let mut i1 = HIST_SIZE;
-		for i in 0..HIST_BUCKETS
-		{
+		for i in 0..HIST_BUCKETS {
 			let bucket = &mut hist[i0..i1];
-			match i & 1
-			{
+			match i & 1 {
 				0 => radix_pass!($key_ty, $keys_in, $keys_temp, $values_in, $values_temp, bucket,
 								 key_bits, HIST_MASK),
 				_ => radix_pass!($key_ty, $keys_temp, $keys_in, $values_temp, $values_in, bucket,
@@ -216,10 +206,8 @@ macro_rules! radix_sort_float(
 		assert_eq!(keys_in.len(), keys_temp.len());
 		assert_eq!($values_in.len(), $values_temp.len());
 
-		for key_ref in keys_in.iter()
-		{
-			for bucket in 0..HIST_BUCKETS
-			{
+		for key_ref in keys_in.iter() {
+			for bucket in 0..HIST_BUCKETS {
 				let key = float_flip(*key_ref);
 				let key_shift = bucket * RADIX_BITS;
 				let pos = ((key >> key_shift) & HIST_MASK) as usize;
@@ -243,11 +231,9 @@ macro_rules! radix_sort_float(
 			i1 += HIST_SIZE;
 		}
 
-		for i in 1..HIST_BUCKETS - 1
-		{
+		for i in 1..HIST_BUCKETS - 1 {
 			let bucket = &mut hist[i0..i1];
-			match i & 1
-			{
+			match i & 1 {
 				0 => radix_pass!(u32, keys_in, keys_temp, $values_in, $values_temp, bucket,
 						key_bits, HIST_MASK),
 				_ => radix_pass!(u32, keys_temp, keys_in, $values_temp, $values_in, bucket,
@@ -260,8 +246,7 @@ macro_rules! radix_sort_float(
 
 		{
 			let bucket = &mut hist[i0..i1];
-			match (HIST_BUCKETS - 1) & 1
-			{
+			match (HIST_BUCKETS - 1) & 1 {
 				0 => radix_pass_encode_float(keys_in, keys_temp, $values_in, $values_temp, bucket,
 						key_bits, HIST_MASK),
 				_ => radix_pass_encode_float(keys_temp, keys_in, $values_temp, $values_in, bucket,
