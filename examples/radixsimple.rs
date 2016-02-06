@@ -12,7 +12,7 @@ fn perf_test(size: usize, iterations: usize)
 {
 	let mut rng = weak_rng();
 	let mut radix8_total = 0f64;
-	for _ in (0..iterations)
+	for _ in 0..iterations
 	{
 		let mut keys0: Vec<u64> = (0..size).map(|_| rng.gen()).collect();
 		let mut keys1: Vec<u64> = repeat(0u64).take(size).collect();

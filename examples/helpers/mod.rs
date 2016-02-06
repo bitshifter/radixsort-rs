@@ -4,7 +4,7 @@ macro_rules! check_sorted(
 	{{
 		assert_eq!($keys.len(), $values.len());
 		assert_eq!($keys.len(), $orig.len());
-		for i in (1..$keys.len())
+		for i in 1..$keys.len()
 		{
 			if $keys[i - 1] > $keys[i]
 			{

@@ -26,7 +26,7 @@ G: Fn(&mut[T], &mut[T], &mut[u32], &mut[u32]) -> usize>(
 	let mut radix11_total = 0f64;
 	let mut stdsort_total = 0f64;
 	let mut introsort_total = 0f64;
-	for _ in (0..iterations)
+	for _ in 0..iterations
 	{
 		let keys_orig: Vec<T> = (0..size).map(|_| rng.gen()).collect();
 		let values_orig: Vec<u32> = (0..size).map(|i| i as u32).collect();
