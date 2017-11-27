@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = ["Cameron Hart <cameron.hart@gmail.com>"]
 
 [dependencies]
-num = "*"
-rand = "*"
+num = "0.1"
+rand = "0.3"
 sortrs = "*"
-time = "*"
+time = "0.1"

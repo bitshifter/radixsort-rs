@@ -21,49 +21,43 @@
 
 use std::mem;
 
-/**
- * Flip a float for sorting.
- *  finds SIGN of fp number.
- *  if it's 1 (negative float), it flips all bits
- *  if it's 0 (positive float), it flips the sign only
- */
+/// Flip a float for sorting.
+/// finds SIGN of fp number.
+/// if it's 1 (negative float), it flips all bits
+/// if it's 0 (positive float), it flips the sign only
 fn float_flip(f: u32) -> u32 {
-	let mask = (-((f >> 31) as i32) as u32) | 0x80000000;
-	f ^ mask
+    let mask = (-((f >> 31) as i32) as u32) | 0x80000000;
+    f ^ mask
 }
 
 
-/**
- * Flip a float back (invert floatFlip)
- *  signed was flipped from above, so:
- *  if sign is 1 (negative), it flips the sign bit back
- *  if sign is 0 (positive), it flips all bits back
- */
+/// Flip a float back (invert floatFlip)
+///  signed was flipped from above, so:
+///  if sign is 1 (negative), it flips the sign bit back
+///  if sign is 0 (positive), it flips all bits back
 fn inv_float_flip(f: u32) -> u32 {
-	let mask = ((f >> 31) - 1) | 0x80000000;
-	f ^ mask
+    let mask = ((f >> 31) - 1) | 0x80000000;
+    f ^ mask
 }
 
 
-fn sum_histograms(hist: &mut[usize], sum: &mut[usize],
-	hist_buckets: usize, hist_size: usize)
-{
-	// Update the histogram data so each entry sums the previous entries
-	for bucket in 0..hist_buckets {
-		let histindex = bucket * hist_size;
-		sum[bucket] = hist[histindex];
-		hist[histindex] = 0;
-	}
+fn sum_histograms(hist: &mut [usize], sum: &mut [usize], hist_buckets: usize, hist_size: usize) {
+    // Update the histogram data so each entry sums the previous entries
+    for bucket in 0..hist_buckets {
+        let histindex = bucket * hist_size;
+        sum[bucket] = hist[histindex];
+        hist[histindex] = 0;
+    }
 
-	let mut tsum : usize;
-	for i in 1..hist_size {
-		for bucket in 0..hist_buckets {
-			let histindex = bucket * hist_size + i;
-			tsum = hist[histindex] + sum[bucket];
-			hist[histindex] = sum[bucket];
-			sum[bucket] = tsum;
-		}
-	}
+    let mut tsum: usize;
+    for i in 1..hist_size {
+        for bucket in 0..hist_buckets {
+            let histindex = bucket * hist_size + i;
+            tsum = hist[histindex] + sum[bucket];
+            hist[histindex] = sum[bucket];
+            sum[bucket] = tsum;
+        }
+    }
 }
 
 
@@ -103,36 +97,44 @@ fn radix_pass<K: Unsigned + Integer + FromPrimitive + ToPrimitive, V: Clone>(
 
 
 fn radix_pass_decode_float<V: Clone>(
-	keys_in: &[u32], keys_out: &mut[u32],
-	values_in: &[V], values_out: &mut[V],
-	hist: &mut[usize], shift: usize, mask: u32)
-{
-	let size = keys_in.len();
-	for i in 0..size {
-		let key = float_flip(keys_in[i]) as usize;
-		let pos = (key >> shift as usize) & mask as usize;
-		let index = hist[pos];
-		hist[pos] += 1;
-		keys_out[index] = key as u32;
-		values_out[index] = values_in[i].clone();
-	}
+    keys_in: &[u32],
+    keys_out: &mut [u32],
+    values_in: &[V],
+    values_out: &mut [V],
+    hist: &mut [usize],
+    shift: usize,
+    mask: u32,
+) {
+    let size = keys_in.len();
+    for i in 0..size {
+        let key = float_flip(keys_in[i]) as usize;
+        let pos = (key >> shift as usize) & mask as usize;
+        let index = hist[pos];
+        hist[pos] += 1;
+        keys_out[index] = key as u32;
+        values_out[index] = values_in[i].clone();
+    }
 }
 
 
 fn radix_pass_encode_float<V: Clone>(
-	keys_in: &[u32], keys_out: &mut[u32],
-	values_in: &[V], values_out: &mut[V],
-	hist: &mut[usize], shift: usize, mask: u32)
-{
-	let size = keys_in.len();
-	for i in 0..size {
-		let key = keys_in[i];
-		let pos = ((key >> shift as usize) & mask) as usize;
-		let index = hist[pos];
-		hist[pos] += 1;
-		keys_out[index] = inv_float_flip(key);
-		values_out[index] = values_in[i].clone();
-	}
+    keys_in: &[u32],
+    keys_out: &mut [u32],
+    values_in: &[V],
+    values_out: &mut [V],
+    hist: &mut [usize],
+    shift: usize,
+    mask: u32,
+) {
+    let size = keys_in.len();
+    for i in 0..size {
+        let key = keys_in[i];
+        let pos = ((key >> shift as usize) & mask) as usize;
+        let index = hist[pos];
+        hist[pos] += 1;
+        keys_out[index] = inv_float_flip(key);
+        values_out[index] = values_in[i].clone();
+    }
 }
 
 
@@ -257,49 +259,60 @@ macro_rules! radix_sort_float(
 
 
 pub fn radix8sort_u64<V: Clone>(
-	keys_in: &mut[u64], keys_temp: &mut[u64],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_uint!(u64, 8, 64, keys_in, keys_temp, values_in, values_temp);
+    keys_in: &mut [u64],
+    keys_temp: &mut [u64],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_uint!(u64, 8, 64, keys_in, keys_temp, values_in, values_temp);
 }
 
 
 pub fn radix8sort_u32<V: Clone>(
-	keys_in: &mut[u32], keys_temp: &mut[u32],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_uint!(u32, 8, 32, keys_in, keys_temp, values_in, values_temp);
+    keys_in: &mut [u32],
+    keys_temp: &mut [u32],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_uint!(u32, 8, 32, keys_in, keys_temp, values_in, values_temp);
 }
 
 
 pub fn radix8sort_f32<V: Clone>(
-	fkeys_in: &mut[f32], fkeys_temp: &mut[f32],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_float!(8, fkeys_in, fkeys_temp, values_in, values_temp);
+    fkeys_in: &mut [f32],
+    fkeys_temp: &mut [f32],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_float!(8, fkeys_in, fkeys_temp, values_in, values_temp);
 }
 
 
 pub fn radix11sort_u64<V: Clone>(
-	keys_in: &mut[u64], keys_temp: &mut[u64],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_uint!(u64, 11, 64, keys_in, keys_temp, values_in, values_temp);
+    keys_in: &mut [u64],
+    keys_temp: &mut [u64],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_uint!(u64, 11, 64, keys_in, keys_temp, values_in, values_temp);
 }
 
 
 pub fn radix11sort_u32<V: Clone>(
-	keys_in: &mut[u32], keys_temp: &mut[u32],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_uint!(u32, 11, 32, keys_in, keys_temp, values_in, values_temp);
+    keys_in: &mut [u32],
+    keys_temp: &mut [u32],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_uint!(u32, 11, 32, keys_in, keys_temp, values_in, values_temp);
 }
 
 
 pub fn radix11sort_f32<V: Clone>(
-	fkeys_in: &mut[f32], fkeys_temp: &mut[f32],
-	values_in: &mut[V], values_temp: &mut[V]) -> usize
-{
-	return radix_sort_float!(11, fkeys_in, fkeys_temp, values_in, values_temp);
+    fkeys_in: &mut [f32],
+    fkeys_temp: &mut [f32],
+    values_in: &mut [V],
+    values_temp: &mut [V],
+) -> usize {
+    return radix_sort_float!(11, fkeys_in, fkeys_temp, values_in, values_temp);
 }
-

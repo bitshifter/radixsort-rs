@@ -19,4 +19,3 @@ macro_rules! check_sorted(
 		}
 	}}
 );
-
