@@ -16,7 +16,7 @@ as described by Michael Herf:
 
 The radix sort interface is designed to perform no memory allocations, and does
 not write the final sorted values to an output buffer, but rather returns which
-buffer the final result resides in. The rationaly here is the callig code can
+buffer the final result resides in. The rationale here is that the caller can
 decide if it's appropriate to allocate temporary space, or to copy the results
 to a specified buffer. If so desired a simple wrapper could be written to
 simplify the interface at the expense of some performance and memory
