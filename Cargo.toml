@@ -8,4 +8,4 @@ authors = ["Cameron Hart <cameron.hart@gmail.com>"]
 num = "0.1"
 rand = "0.3"
 sortrs = "*"
-time = "0.1"
+time = "0.2"
